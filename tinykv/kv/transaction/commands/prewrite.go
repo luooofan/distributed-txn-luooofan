@@ -70,17 +70,59 @@ func (p *Prewrite) prewriteMutation(txn *mvcc.MvccTxn, mut *kvrpcpb.Mutation) (*
 	// Hint: Check the interafaces provided by `mvcc.MvccTxn`. The error type `kvrpcpb.WriteConflict` is used
 	//		 denote to write conflict error, try to set error information properly in the `kvrpcpb.KeyError`
 	//		 response.
-	panic("prewriteMutation is not implemented yet")
+	write, commitTs, err := txn.MostRecentWrite(key)
+	if err != nil {
+		return nil, err
+	} else if write != nil {
+		if write.StartTS == txn.StartTS {
+			// already commit/rollback, just discard this request
+			return &kvrpcpb.KeyError{Abort: "already commit or rollback"}, nil
+		} else if commitTs > txn.StartTS {
+			return &kvrpcpb.KeyError{Conflict: &kvrpcpb.WriteConflict{
+				StartTs:    write.StartTS,
+				ConflictTs: commitTs,
+				Key:        key,
+				Primary:    nil,
+			}}, nil
+		}
+	}
+	// panic("prewriteMutation is not implemented yet")
 
 	// YOUR CODE HERE (lab1).
 	// Check if key is locked. Report key is locked error if lock does exist, note the key could be locked
 	// by this transaction already and the current prewrite request is stale.
-	panic("check lock in prewrite is not implemented yet")
-
+	// panic("check lock in prewrite is not implemented yet")
+	lock, err := txn.GetLock(key)
+	if err != nil {
+		return nil, err
+	}
+	if lock == nil || lock.Ts != txn.StartTS {
+		write, _, err := txn.CurrentWrite(key)
+		if err != nil {
+			return nil, err
+		}
+		if write != nil {
+			return &kvrpcpb.KeyError{Abort: "already commit or rollback"}, nil
+		}
+	}
+	if lock != nil {
+		if lock.Ts == txn.StartTS {
+			return nil, nil
+		} else {
+			return &kvrpcpb.KeyError{Locked: lock.Info(key)}, nil
+		}
+	}
 	// YOUR CODE HERE (lab1).
 	// Write a lock and value.
 	// Hint: Check the interfaces provided by `mvccTxn.Txn`.
-	panic("lock record generation is not implemented yet")
+	// panic("lock record generation is not implemented yet")
+	txn.PutLock(key, &mvcc.Lock{
+		Primary: p.request.PrimaryLock,
+		Ts:      p.request.StartVersion,
+		Ttl:     p.request.LockTtl,
+		Kind:    mvcc.WriteKindPut,
+	})
+	txn.PutValue(key, mut.Value)
 
 	return nil, nil
 }
