@@ -469,6 +469,10 @@ func (c *RegionCache) GroupKeysByRegion(bo *Backoffer, keys [][]byte, filter fun
 		if filter != nil && filter(key, keyRegion.StartKey) {
 			continue
 		}
+		// if _, ok := groupedKeys[keyRegion.Region]; !ok {
+		// 	fmt.Println("region: ", keyRegion.Region.id, keyRegion.StartKey.String(), keyRegion.EndKey.String())
+		// }
+		// fmt.Println("region: ", keyRegion.Region.id, keyRegion.StartKey.String(), keyRegion.EndKey.String(), "key: ", string(key))
 		groupedKeys[keyRegion.Region] = append(groupedKeys[keyRegion.Region], key)
 		if first {
 			firstKeyRegion = keyRegion.Region
